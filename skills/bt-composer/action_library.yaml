@@ -1,0 +1,286 @@
+# Action Library for ROS Turtlesim Behavior Trees
+# This catalog lists all available action nodes for composing behavior trees
+
+primitives:
+  GoToPose:
+    description: "Move the turtle to a target position and orientation"
+    package: "py_trees_nodes.primitives"
+    parameters:
+      - name: "name"
+        type: "str"
+        required: true
+        description: "Name of this behavior node"
+      - name: "x"
+        type: "float"
+        required: true
+        description: "Target x coordinate (0-11 for turtlesim)"
+      - name: "y"
+        type: "float"
+        required: true
+        description: "Target y coordinate (0-11 for turtlesim)"
+      - name: "theta"
+        type: "float"
+        required: false
+        default: null
+        description: "Target orientation in radians (None to ignore orientation)"
+      - name: "tolerance_pos"
+        type: "float"
+        required: false
+        default: 0.1
+        description: "Position tolerance in meters"
+      - name: "tolerance_angle"
+        type: "float"
+        required: false
+        default: 0.1
+        description: "Angular tolerance in radians"
+    returns: "SUCCESS when target reached, RUNNING while moving, FAILURE on error"
+    example: "GoToPose(name='GoToCorner', x=5.0, y=5.0, theta=0.0)"
+
+  SetPen:
+    description: "Configure the turtle's drawing pen (color, width, on/off)"
+    package: "py_trees_nodes.primitives"
+    parameters:
+      - name: "name"
+        type: "str"
+        required: true
+        description: "Name of this behavior node"
+      - name: "r"
+        type: "int"
+        required: false
+        default: 255
+        description: "Red color value (0-255)"
+      - name: "g"
+        type: "int"
+        required: false
+        default: 255
+        description: "Green color value (0-255)"
+      - name: "b"
+        type: "int"
+        required: false
+        default: 255
+        description: "Blue color value (0-255)"
+      - name: "width"
+        type: "int"
+        required: false
+        default: 3
+        description: "Pen width"
+      - name: "off"
+        type: "int"
+        required: false
+        default: 0
+        description: "Pen state: 0=drawing enabled, 1=drawing disabled"
+    returns: "SUCCESS when pen configured, RUNNING while processing, FAILURE on error"
+    example: "SetPen(name='SetBlue', r=0, g=0, b=255, width=3, off=0)"
+
+  PenUp:
+    description: "Convenience action to lift the pen (disable drawing)"
+    package: "py_trees_nodes.primitives"
+    parameters:
+      - name: "name"
+        type: "str"
+        required: false
+        default: "PenUp"
+        description: "Name of this behavior node"
+    returns: "SUCCESS when pen lifted"
+    example: "PenUp(name='LiftPen')"
+
+  PenDown:
+    description: "Convenience action to lower the pen (enable drawing)"
+    package: "py_trees_nodes.primitives"
+    parameters:
+      - name: "name"
+        type: "str"
+        required: false
+        default: "PenDown"
+        description: "Name of this behavior node"
+      - name: "r"
+        type: "int"
+        required: false
+        default: 255
+        description: "Red color value (0-255)"
+      - name: "g"
+        type: "int"
+        required: false
+        default: 255
+        description: "Green color value (0-255)"
+      - name: "b"
+        type: "int"
+        required: false
+        default: 255
+        description: "Blue color value (0-255)"
+      - name: "width"
+        type: "int"
+        required: false
+        default: 3
+        description: "Pen width"
+    returns: "SUCCESS when pen lowered"
+    example: "PenDown(name='StartDrawing', r=255, g=0, b=0, width=5)"
+
+  MoveDistance:
+    description: "Move the turtle forward or backward by a specified distance"
+    package: "py_trees_nodes.primitives"
+    parameters:
+      - name: "name"
+        type: "str"
+        required: true
+        description: "Name of this behavior node"
+      - name: "distance"
+        type: "float"
+        required: true
+        description: "Distance to move (positive=forward, negative=backward)"
+      - name: "speed"
+        type: "float"
+        required: false
+        default: 1.0
+        description: "Linear speed in m/s"
+    returns: "SUCCESS when distance completed, RUNNING while moving, FAILURE on error"
+    example: "MoveDistance(name='MoveForward', distance=2.0, speed=1.0)"
+
+  GetPose:
+    description: "Read the current pose of the turtle and store in blackboard"
+    package: "py_trees_nodes.primitives"
+    parameters:
+      - name: "name"
+        type: "str"
+        required: false
+        default: "GetPose"
+        description: "Name of this behavior node"
+      - name: "blackboard_key"
+        type: "str"
+        required: false
+        default: "current_pose"
+        description: "Blackboard key to store pose data"
+    returns: "SUCCESS when pose read, RUNNING while waiting, FAILURE on error"
+    example: "GetPose(name='ReadPosition', blackboard_key='start_pose')"
+
+  CheckBounds:
+    description: "Check if the turtle is within specified bounds (condition node)"
+    package: "py_trees_nodes.primitives"
+    parameters:
+      - name: "name"
+        type: "str"
+        required: false
+        default: "CheckBounds"
+        description: "Name of this behavior node"
+      - name: "min_x"
+        type: "float"
+        required: false
+        default: 1.0
+        description: "Minimum x coordinate"
+      - name: "max_x"
+        type: "float"
+        required: false
+        default: 10.0
+        description: "Maximum x coordinate"
+      - name: "min_y"
+        type: "float"
+        required: false
+        default: 1.0
+        description: "Minimum y coordinate"
+      - name: "max_y"
+        type: "float"
+        required: false
+        default: 10.0
+        description: "Maximum y coordinate"
+    returns: "SUCCESS if in bounds, FAILURE if out of bounds"
+    example: "CheckBounds(name='SafetyCheck', min_x=1.0, max_x=10.0, min_y=1.0, max_y=10.0)"
+
+composites:
+  DrawShape:
+    description: "High-level action to draw geometric shapes (circle, square, triangle)"
+    package: "py_trees_nodes.composites"
+    parameters:
+      - name: "name"
+        type: "str"
+        required: true
+        description: "Name of this behavior node"
+      - name: "shape_type"
+        type: "str"
+        required: true
+        description: "Shape to draw: 'circle', 'square', or 'triangle'"
+      - name: "size"
+        type: "float"
+        required: true
+        description: "Size of shape (radius for circle, side length for others)"
+      - name: "center_x"
+        type: "float"
+        required: false
+        default: 5.5
+        description: "X coordinate of shape center"
+      - name: "center_y"
+        type: "float"
+        required: false
+        default: 5.5
+        description: "Y coordinate of shape center"
+      - name: "color"
+        type: "tuple[int, int, int]"
+        required: false
+        default: "(255, 255, 255)"
+        description: "RGB color tuple"
+      - name: "width"
+        type: "int"
+        required: false
+        default: 3
+        description: "Pen width"
+      - name: "segments"
+        type: "int"
+        required: false
+        default: 36
+        description: "Number of segments for circle"
+    returns: "SUCCESS when shape completed, RUNNING while drawing, FAILURE on error"
+    example: "DrawShape(name='DrawCircle', shape_type='circle', size=2.0, center_x=5.5, center_y=5.5, color=(0,255,0))"
+
+  PatrolWaypoints:
+    description: "Navigate through a list of waypoints in sequence"
+    package: "py_trees_nodes.composites"
+    parameters:
+      - name: "name"
+        type: "str"
+        required: true
+        description: "Name of this behavior node"
+      - name: "waypoints"
+        type: "list[tuple]"
+        required: true
+        description: "List of waypoints as (x,y) or (x,y,theta) tuples"
+      - name: "loop"
+        type: "bool"
+        required: false
+        default: false
+        description: "If True, return to first waypoint at end"
+    returns: "SUCCESS when all waypoints visited, RUNNING while patrolling, FAILURE on error"
+    example: "PatrolWaypoints(name='Patrol', waypoints=[(3,3), (8,3), (8,8), (3,8)], loop=True)"
+
+py_trees_composites:
+  Sequence:
+    description: "Execute children in order until one fails or all succeed"
+    class: "py_trees.composites.Sequence"
+    behavior: "Returns SUCCESS if all children succeed, FAILURE if any child fails"
+    example: |
+      sequence = py_trees.composites.Sequence(name='MySequence', memory=False)
+      sequence.add_children([child1, child2, child3])
+
+  Selector:
+    description: "Execute children in order until one succeeds"
+    class: "py_trees.composites.Selector"
+    behavior: "Returns SUCCESS if any child succeeds, FAILURE if all children fail"
+    example: |
+      selector = py_trees.composites.Selector(name='MySelector', memory=False)
+      selector.add_children([child1, child2, child3])
+
+  Parallel:
+    description: "Execute all children concurrently"
+    class: "py_trees.composites.Parallel"
+    behavior: "Returns based on policy (e.g., SuccessOnAll, SuccessOnOne)"
+    example: |
+      parallel = py_trees.composites.Parallel(
+          name='MyParallel',
+          policy=py_trees.common.ParallelPolicy.SuccessOnAll()
+      )
+      parallel.add_children([child1, child2])
+
+turtlesim_bounds:
+  description: "Turtlesim workspace boundaries"
+  x_range: [0.0, 11.0]
+  y_range: [0.0, 11.0]
+  default_spawn: [5.544445, 5.544445]
+  warning: "Going outside bounds will cause the turtle to wrap around or fail"
