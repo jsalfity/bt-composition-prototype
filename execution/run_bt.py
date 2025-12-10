@@ -10,13 +10,14 @@ Usage:
 The BT file must define a create_root() function that returns the root node.
 """
 
-import sys
 import os
+import sys
 import importlib.util
 import time
 import logging
+import uuid
 import py_trees
-from typing import Optional
+from typing import Dict, Optional
 
 # Add project root to path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -103,8 +104,62 @@ def setup_behavior_tree(root: py_trees.behaviour.Behaviour) -> bool:
         return False
 
 
+def build_node_lookup(
+    root: py_trees.behaviour.Behaviour,
+) -> Dict[uuid.UUID, py_trees.behaviour.Behaviour]:
+    """
+    Build a lookup table from behaviour id to behaviour instance.
+
+    This lets us resolve SnapshotVisitor ids back to readable node names.
+    """
+    nodes = [root] + [child for child in root.iterate()]
+    return {node.id: node for node in nodes}
+
+
+def print_tick_visualization(
+    tick_count: int,
+    root: py_trees.behaviour.Behaviour,
+    snapshot: py_trees.visitors.SnapshotVisitor,
+    node_lookup: Dict[uuid.UUID, py_trees.behaviour.Behaviour],
+) -> None:
+    """
+    Pretty-print the nodes ticked this cycle and their statuses.
+    """
+    ticked_names = [
+        node_lookup[node_id].name for node_id in snapshot.visited.keys() if node_id in node_lookup
+    ]
+    running_names = [
+        node_lookup[node_id].name
+        for node_id, status in snapshot.visited.items()
+        if status == py_trees.common.Status.RUNNING and node_id in node_lookup
+    ]
+
+    print("\n" + "-" * 80)
+    print(f"TICK {tick_count:03d} | Root status: {root.status}")
+    if ticked_names:
+        print("Tick path: " + " -> ".join(ticked_names))
+    else:
+        print("Tick path: (no nodes visited)")
+
+    if running_names:
+        print("Running: " + ", ".join(running_names))
+
+    print(
+        py_trees.display.unicode_tree(
+            root,
+            show_status=True,
+            show_only_visited=True,
+            visited=snapshot.visited,
+            previously_visited=snapshot.previously_visited,
+        )
+    )
+    print("-" * 80 + "\n")
+
+
 def execute_behavior_tree(
-    root: py_trees.behaviour.Behaviour, tick_rate: float = 10.0, max_ticks: int = 1000
+    root: py_trees.behaviour.Behaviour,
+    tick_rate: float = 10.0,
+    max_ticks: int = 1000
 ):
     """
     Execute the behavior tree.
@@ -130,6 +185,9 @@ def execute_behavior_tree(
 
         # Create the behavior tree
         tree = py_trees.trees.BehaviourTree(root)
+        snapshot_visitor = py_trees.visitors.SnapshotVisitor()
+        tree.visitors.append(snapshot_visitor)
+        node_lookup = build_node_lookup(root)
 
         tick_period = 1.0 / tick_rate
         tick_count = 0
@@ -139,6 +197,7 @@ def execute_behavior_tree(
             # Tick the tree
             tree.tick()
             tick_count += 1
+            print_tick_visualization(tick_count, root, snapshot_visitor, node_lookup)
 
             # Check status
             current_status = root.status
@@ -147,6 +206,13 @@ def execute_behavior_tree(
             if current_status != last_status:
                 logger.info(f"Tick {tick_count}: Root status = {current_status}")
                 last_status = current_status
+
+                # Print tree state on status change
+                print("\n" + "=" * 80)
+                print(f"TICK {tick_count}: Tree Status = {current_status}")
+                print("=" * 80)
+                print(py_trees.display.unicode_tree(root, show_status=True))
+                print("=" * 80 + "\n")
 
             # Check if tree is done
             if current_status == py_trees.common.Status.SUCCESS:
@@ -224,10 +290,8 @@ def main():
     """Main execution function."""
     if len(sys.argv) < 2:
         print("Usage: python execution/run_bt.py path/to/behavior_tree.py")
-        print("\nExample:")
-        print(
-            "    python execution/run_bt.py bt_library/manual_examples/draw_square.py"
-        )
+        print("\nExamples:")
+        print("    python execution/run_bt.py bt_library/manual_examples/draw_square.py")
         sys.exit(1)
 
     bt_file_path = sys.argv[1]
