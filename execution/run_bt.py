@@ -16,6 +16,7 @@ import importlib.util
 import time
 import logging
 import uuid
+import argparse
 import py_trees
 from typing import Dict, Optional
 
@@ -26,10 +27,6 @@ sys.path.insert(0, project_root)
 from execution.ros_connection import check_ros_connection
 
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
 logger = logging.getLogger("BTExecutor")
 
 
@@ -116,23 +113,32 @@ def build_node_lookup(
     return {node.id: node for node in nodes}
 
 
-def print_tick_visualization(
-    tick_count: int,
-    root: py_trees.behaviour.Behaviour,
+def extract_tick_info(
     snapshot: py_trees.visitors.SnapshotVisitor,
     node_lookup: Dict[uuid.UUID, py_trees.behaviour.Behaviour],
-) -> None:
-    """
-    Pretty-print the nodes ticked this cycle and their statuses.
-    """
+) -> tuple[list[str], list[str]]:
+    """Return readable names for ticked and running nodes this cycle."""
     ticked_names = [
-        node_lookup[node_id].name for node_id in snapshot.visited.keys() if node_id in node_lookup
+        node_lookup[node_id].name
+        for node_id in snapshot.visited.keys()
+        if node_id in node_lookup
     ]
     running_names = [
         node_lookup[node_id].name
         for node_id, status in snapshot.visited.items()
         if status == py_trees.common.Status.RUNNING and node_id in node_lookup
     ]
+    return ticked_names, running_names
+
+
+def print_tick_visualization(
+    tick_count: int,
+    root: py_trees.behaviour.Behaviour,
+    snapshot: py_trees.visitors.SnapshotVisitor,
+    ticked_names: list[str],
+    running_names: list[str],
+) -> None:
+    """Pretty-print the nodes ticked this cycle and their statuses."""
 
     print("\n" + "-" * 80)
     print(f"TICK {tick_count:03d} | Root status: {root.status}")
@@ -159,7 +165,8 @@ def print_tick_visualization(
 def execute_behavior_tree(
     root: py_trees.behaviour.Behaviour,
     tick_rate: float = 10.0,
-    max_ticks: int = 1000
+    max_ticks: int = 1000,
+    enable_debug_visitor: bool = False,
 ):
     """
     Execute the behavior tree.
@@ -187,17 +194,28 @@ def execute_behavior_tree(
         tree = py_trees.trees.BehaviourTree(root)
         snapshot_visitor = py_trees.visitors.SnapshotVisitor()
         tree.visitors.append(snapshot_visitor)
+        if enable_debug_visitor:
+            tree.visitors.append(py_trees.visitors.DebugVisitor())
         node_lookup = build_node_lookup(root)
 
         tick_period = 1.0 / tick_rate
         tick_count = 0
         last_status = None
+        last_ticked_names: list[str] = []
+        last_running_names: list[str] = []
 
         while tick_count < max_ticks:
             # Tick the tree
             tree.tick()
             tick_count += 1
-            print_tick_visualization(tick_count, root, snapshot_visitor, node_lookup)
+            ticked_names, running_names = extract_tick_info(snapshot_visitor, node_lookup)
+
+            # Only print when something meaningful changed
+            should_print = (
+                snapshot_visitor.changed
+                or ticked_names != last_ticked_names
+                or running_names != last_running_names
+            )
 
             # Check status
             current_status = root.status
@@ -213,6 +231,14 @@ def execute_behavior_tree(
                 print("=" * 80)
                 print(py_trees.display.unicode_tree(root, show_status=True))
                 print("=" * 80 + "\n")
+                should_print = True
+
+            if should_print:
+                print_tick_visualization(
+                    tick_count, root, snapshot_visitor, ticked_names, running_names
+                )
+                last_ticked_names = ticked_names
+                last_running_names = running_names
 
             # Check if tree is done
             if current_status == py_trees.common.Status.SUCCESS:
@@ -288,20 +314,46 @@ def shutdown_behavior_tree(root: py_trees.behaviour.Behaviour):
 
 def main():
     """Main execution function."""
-    if len(sys.argv) < 2:
-        print("Usage: python execution/run_bt.py path/to/behavior_tree.py")
-        print("\nExamples:")
-        print("    python execution/run_bt.py bt_library/manual_examples/draw_square.py")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Execute a py_trees behavior tree file.")
+    parser.add_argument("bt_file_path", help="Path to the behavior tree Python file")
+    parser.add_argument(
+        "--tick-rate", type=float, default=10.0, help="Tick rate in Hz (default: 10.0)"
+    )
+    parser.add_argument(
+        "--max-ticks",
+        type=int,
+        default=1000,
+        help="Maximum ticks before timeout (default: 1000)",
+    )
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging level (default: INFO)",
+    )
+    parser.add_argument(
+        "--debug-visitor",
+        action="store_true",
+        help="Enable py_trees DebugVisitor to emit per-node debug logs",
+    )
+    args = parser.parse_args()
 
-    bt_file_path = sys.argv[1]
+    effective_log_level = "DEBUG" if args.debug_visitor else args.log_level.upper()
+    # Configure logging after parsing args so overrides work
+    logging.basicConfig(
+        level=getattr(logging, effective_log_level, logging.INFO),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        force=True,
+    )
+    logger.setLevel(getattr(logging, effective_log_level, logging.INFO))
 
     # Skip initial ROS check - nodes will handle connection
     # (Avoids Twisted reactor restart issue)
     logger.info("Will connect to ROS when setting up nodes...")
 
     # Load the BT module
-    module = load_bt_module(bt_file_path)
+    module = load_bt_module(args.bt_file_path)
     if module is None:
         sys.exit(1)
 
@@ -327,7 +379,13 @@ def main():
         sys.exit(1)
 
     # Execute the behavior tree
-    success = execute_behavior_tree(root, tick_rate=10.0, max_ticks=1000)
+    enable_debug_visitor = args.debug_visitor or effective_log_level == "DEBUG"
+    success = execute_behavior_tree(
+        root,
+        tick_rate=args.tick_rate,
+        max_ticks=args.max_ticks,
+        enable_debug_visitor=enable_debug_visitor,
+    )
 
     # Shutdown
     shutdown_behavior_tree(root)
