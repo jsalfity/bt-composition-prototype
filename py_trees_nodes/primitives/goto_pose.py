@@ -8,22 +8,21 @@ and orientation.
 import py_trees
 from roslibpy import Topic
 import math
-import time
 from typing import Optional
 from ..base_action import BaseActionNode
 
 
 class GoToPose(BaseActionNode):
     """
-    Move the turtle to a target pose (x, y, theta).
+    Move the turtle to a target position using a rotate-then-translate approach.
 
-    This node uses a simple proportional controller to move the turtle to the
-    target position and orientation. It publishes to /turtle1/cmd_vel.
+    This node first orients toward the goal, then drives straight until the
+    position tolerance is met. It does not enforce a final heading.
 
     Args:
         x: Target x coordinate (0-11, turtlesim bounds)
         y: Target y coordinate (0-11, turtlesim bounds)
-        theta: Target orientation in radians (optional, will only position if None)
+        theta: Unused final orientation (kept for API compatibility)
         tolerance_pos: Position tolerance in meters (default: 0.1)
         tolerance_angle: Angular tolerance in radians (default: 0.1)
     """
@@ -59,6 +58,7 @@ class GoToPose(BaseActionNode):
         self.angular_speed_gain = 2.0
         self.max_linear_speed = 2.0
         self.max_angular_speed = 2.0
+        self._phase = "orient_to_target"
 
     def setup(self, **kwargs):
         """Set up ROS topics for command and pose."""
@@ -93,8 +93,9 @@ class GoToPose(BaseActionNode):
     def initialise(self):
         """Initialize when first ticked."""
         super().initialise()
+        self._phase = "orient_to_target"
         self.logger.info(
-            f"Starting navigation to ({self.target_x}, {self.target_y}, {self.target_theta})"
+            f"Starting navigation to ({self.target_x}, {self.target_y})"
         )
 
     def update(self) -> py_trees.common.Status:
@@ -116,47 +117,35 @@ class GoToPose(BaseActionNode):
 
         # Check if we've reached the position target
         if distance < self.tolerance_pos:
-            # Check if we need to align to a target angle
-            if self.target_theta is not None:
-                angle_error = self._normalize_angle(
-                    self.target_theta - self.current_theta
-                )
-
-                if abs(angle_error) < self.tolerance_angle:
-                    # Reached both position and orientation targets
-                    self._stop_turtle()
-                    self.logger.info(
-                        f"Reached target pose ({self.target_x}, {self.target_y}, {self.target_theta})"
-                    )
-                    return py_trees.common.Status.SUCCESS
-                else:
-                    # Rotate to target angle
-                    self._rotate_to_angle(angle_error)
-                    return py_trees.common.Status.RUNNING
-            else:
-                # Only position target, no orientation requirement
-                self._stop_turtle()
-                self.logger.info(
-                    f"Reached target position ({self.target_x}, {self.target_y})"
-                )
-                return py_trees.common.Status.SUCCESS
+            # Reached position target; keep current orientation (no final facing requirement)
+            self._stop_turtle()
+            self.logger.info(
+                f"Reached target position ({self.target_x}, {self.target_y})"
+            )
+            return py_trees.common.Status.SUCCESS
 
         # Calculate angle to target
         angle_to_target = math.atan2(dy, dx)
         angle_error = self._normalize_angle(angle_to_target - self.current_theta)
 
-        # If we need to turn more than 90 degrees, just rotate first
-        if abs(angle_error) > math.pi / 2:
-            self._rotate_to_angle(angle_error)
-        else:
-            # Move forward while adjusting heading
-            linear_vel = min(self.linear_speed_gain * distance, self.max_linear_speed)
-            angular_vel = self.angular_speed_gain * angle_error
-            angular_vel = max(
-                min(angular_vel, self.max_angular_speed), -self.max_angular_speed
-            )
+        # Phase 1: point toward the target
+        if self._phase == "orient_to_target":
+            if abs(angle_error) > self.tolerance_angle:
+                self._rotate_to_angle(angle_error)
+                return py_trees.common.Status.RUNNING
+            # Heading is good, start driving straight
+            self._phase = "drive_straight"
 
-            self._publish_velocity(linear_vel, angular_vel)
+        # Phase 2: drive straight toward the target
+        if self._phase == "drive_straight":
+            # If we drift off-heading, pause driving and re-orient
+            if abs(angle_error) > self.tolerance_angle:
+                self._publish_velocity(0.0, 0.0)
+                self._phase = "orient_to_target"
+                return py_trees.common.Status.RUNNING
+
+            linear_vel = min(self.linear_speed_gain * distance, self.max_linear_speed)
+            self._publish_velocity(linear_vel, 0.0)
 
         return py_trees.common.Status.RUNNING
 
@@ -192,4 +181,5 @@ class GoToPose(BaseActionNode):
     def terminate(self, new_status: py_trees.common.Status):
         """Stop the turtle when terminating."""
         self._stop_turtle()
+        self._phase = "orient_to_target"
         super().terminate(new_status)
