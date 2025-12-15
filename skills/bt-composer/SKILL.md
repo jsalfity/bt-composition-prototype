@@ -35,7 +35,7 @@ def create_root() -> py_trees.behaviour.Behaviour:
     """
 
     # Build your tree here
-    root = py_trees.composites.Sequence(name="MainTask", memory=False)
+    root = py_trees.composites.Sequence(name="MainTask", memory=True)
 
     # Add children...
 
@@ -166,7 +166,7 @@ PatrolWaypoints(
 **Use**: Execute actions in order; all must succeed
 
 ```python
-sequence = py_trees.composites.Sequence(name="DoABC", memory=False)
+sequence = py_trees.composites.Sequence(name="DoABC", memory=True)
 sequence.add_children([action_a, action_b, action_c])
 ```
 
@@ -179,7 +179,7 @@ sequence.add_children([action_a, action_b, action_c])
 **Use**: Try alternatives until one succeeds
 
 ```python
-selector = py_trees.composites.Selector(name="TryOptions", memory=False)
+selector = py_trees.composites.Selector(name="TryOptions", memory=True)
 selector.add_children([option_a, option_b, option_c])
 ```
 
@@ -207,17 +207,17 @@ parallel.add_children([action_a, action_b])
 
 ## Common Patterns
 
-### Pattern 1: Setup ’ Execute
+### Pattern 1: Setup ï¿½ Execute
 ```python
-root = py_trees.composites.Sequence(name="Task", memory=False)
+root = py_trees.composites.Sequence(name="Task", memory=True)
 setup = SetPen(name="SetColor", r=255, g=0, b=0, width=3, off=0)
 action = GoToPose(name="Move", x=5.0, y=5.0)
 root.add_children([setup, action])
 ```
 
-### Pattern 2: Check Condition ’ Act
+### Pattern 2: Check Condition ï¿½ Act
 ```python
-root = py_trees.composites.Sequence(name="SafeMove", memory=False)
+root = py_trees.composites.Sequence(name="SafeMove", memory=True)
 check = CheckBounds(name="VerifySafe", min_x=1.0, max_x=10.0, min_y=1.0, max_y=10.0)
 move = GoToPose(name="Move", x=8.0, y=8.0)
 root.add_children([check, move])
@@ -225,15 +225,15 @@ root.add_children([check, move])
 
 ### Pattern 3: Try Multiple Approaches
 ```python
-root = py_trees.composites.Selector(name="TryPaths", memory=False)
+root = py_trees.composites.Selector(name="TryPaths", memory=True)
 path_a = GoToPose(name="DirectPath", x=9.0, y=9.0)
 path_b = PatrolWaypoints(name="SafePath", waypoints=[(5,7), (7,9), (9,9)])
 root.add_children([path_a, path_b])
 ```
 
-### Pattern 4: Sense ’ Decide ’ Act
+### Pattern 4: Sense ï¿½ Decide ï¿½ Act
 ```python
-root = py_trees.composites.Sequence(name="Adaptive", memory=False)
+root = py_trees.composites.Sequence(name="Adaptive", memory=True)
 sense = GetPose(name="CheckPosition", blackboard_key='start')
 decide = CheckBounds(name="InSafeZone", min_x=2.0, max_x=9.0)
 act = GoToPose(name="MoveToGoal", x=5.0, y=5.0)
@@ -257,11 +257,11 @@ root.add_children([sense, decide, act])
 - Purple: (128, 0, 128)
 - White: (255, 255, 255)
 
-**Angles**: Radians (0 to 2À)
+**Angles**: Radians (0 to 2ï¿½)
 - 0: East (right)
-- À/2: North (up)
-- À: West (left)
-- 3À/2: South (down)
+- ï¿½/2: North (up)
+- ï¿½: West (left)
+- 3ï¿½/2: South (down)
 
 ---
 
@@ -328,7 +328,7 @@ from py_trees_nodes.composites import DrawShape, PatrolWaypoints
 
 def create_root() -> py_trees.behaviour.Behaviour:
     """
-    Create BT: Draw blue square ’ Patrol around it
+    Create BT: Draw blue square ï¿½ Patrol around it
 
     Returns:
         Root node of the behavior tree
@@ -337,7 +337,7 @@ def create_root() -> py_trees.behaviour.Behaviour:
     # Main sequence: do drawing first, then patrol
     root = py_trees.composites.Sequence(
         name="DrawAndPatrol",
-        memory=False
+        memory=True
     )
 
     # Step 1: Draw a blue square
