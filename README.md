@@ -1,16 +1,16 @@
 # BT Composition Prototype for ROS Turtlesim
 
-A minimal viable prototype for autonomous behavior tree (BT) composition using py_trees with ROS2 Turtlesim. This system enables an AI agent (Claude) to generate executable behavior trees from natural language descriptions.
-
-**Phase 1 Status**: MVP Complete - Manual execution, baseline functionality
+A research prototype for autonomous behavior tree (BT) composition using py_trees with ROS2 Turtlesim. This system enables an AI agent (Claude) to generate executable behavior trees from natural language descriptions.
 
 ---
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Architecture](#architecture)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+- [Claude Skills Setup](#claude-skills-setup)
 - [Quick Start](#quick-start)
 - [Project Structure](#project-structure)
 - [Available Actions](#available-actions)
@@ -18,30 +18,87 @@ A minimal viable prototype for autonomous behavior tree (BT) composition using p
 - [Validation](#validation)
 - [Examples](#examples)
 - [Troubleshooting](#troubleshooting)
-- [Next Steps](#next-steps)
 
 ---
 
 ## Overview
 
-This prototype demonstrates:
+This prototype demonstrates AI-driven behavior tree composition with validation:
 
-1. **Manual behavior trees** - Hand-crafted baseline examples
+1. **Claude Skills** - bt-composer, bt-validator, bt-action-discovery
 2. **Action library** - Primitive and compositional nodes for turtlesim control
-3. **Execution engine** - Run behavior trees with py_trees
-4. **Validation tools** - Syntax and ROS dependency checking
-5. **Claude skill** - Enable AI agent to generate behavior trees
+3. **Validation tools** - 3-tier validation (syntax, parameters, semantics)
+4. **Execution engine** - Run behavior trees with py_trees + ROS
 
-### Architecture
+---
+
+## Architecture
 
 ```
-User Request → Claude (uses SKILL.md) → Generated BT (.py)
-                                              ↓
-                                    Validation (optional)
-                                              ↓
-                                         Execution
-                                              ↓
-                                    ROS2 Turtlesim (via rosbridge)
+┌─────────────────────────────────────────────────────────────────────┐
+│                          USER REQUEST                                │
+│                    "Draw a red circle"                               │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                        CLAUDE CODE                                   │
+│                   (Invokes bt-composer skill)                        │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    BT-COMPOSER SKILL                                 │
+│                  (~/.claude/skills/bt-composer/)                     │
+│                                                                      │
+│  Step 1: Discover Actions                                           │
+│    ├─> Invokes: bt-action-discovery skill                           │
+│    │     └─> Reads: ./skills/action_library.yaml                    │
+│    └─> Returns: Available actions & constraints                     │
+│                                                                      │
+│  Step 2: Generate BT                                                 │
+│    └─> Creates: generated_bts/draw_red_circle.py                    │
+│                                                                      │
+│  Step 3: Validate                                                    │
+│    └─> Runs: python validation/orchestrator.py <file>               │
+│          ├─> validation/syntax_checker.py (Tier 1: Critical)        │
+│          ├─> validation/ros_checker.py (Tier 1: Critical)           │
+│          ├─> Parameter checks (Tier 2: Important)                   │
+│          └─> Semantic checks (Tier 3: Advisory)                     │
+│                                                                      │
+│  Step 4: Handle Results                                              │
+│    ├─> Tier 1 Fail? Regenerate (max 3x)                             │
+│    └─> All Pass? Present to user                                    │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         EXECUTION                                    │
+│    python execution/run_bt.py generated_bts/draw_red_circle.py      │
+│                           │                                          │
+│                           ▼                                          │
+│                   ROS2 Turtlesim                                     │
+│                  (via rosbridge:9090)                                │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Component Relationships
+
+```
+~/.claude/skills/              Project Repository
+┌────────────────────┐        ┌──────────────────────────────────────┐
+│  bt-composer/      │        │  skills/                             │
+│  (generic)         │◄───────│    └─ bt-action-discovery/           │
+│                    │ invokes│         └─ SKILL.md                  │
+├────────────────────┤        │                                       │
+│  bt-validator/     │        │  validation/   (Python tools)        │
+│  (generic)         │───────►│    ├─ orchestrator.py                │
+│                    │ invokes│    ├─ syntax_checker.py              │
+└────────────────────┘        │    └─ ros_checker.py                 │
+                              │                                       │
+                              │  action_library.yaml                 │
+                              │  (robot-specific actions)             │
+                              └──────────────────────────────────────┘
 ```
 
 ---
@@ -52,11 +109,10 @@ User Request → Claude (uses SKILL.md) → Generated BT (.py)
 
 - **Python 3.10+**
 - **Docker** (for ROS2 Turtlesim with rosbridge)
-- **ros-mcp-server** (for Claude to interact with ROS)
+- **Claude Code** (for AI-driven BT generation)
 
 ### Python Packages
 
-Install via `requirements.txt`:
 ```bash
 pip install -r requirements.txt
 ```
@@ -70,9 +126,10 @@ Includes:
 
 ## Installation
 
-### 1. Clone or Create Project
+### 1. Clone Repository
 
 ```bash
+git clone <repo-url>
 cd bt-composition-prototype
 ```
 
@@ -84,9 +141,8 @@ pip install -r requirements.txt
 
 ### 3. Start ROS2 Turtlesim with Rosbridge
 
-Ensure your Docker container with ROS2 Turtlesim is running with rosbridge_server accessible at `localhost:9090`.
+Ensure rosbridge_server is accessible at `localhost:9090`.
 
-Example Docker command (adjust to your setup):
 ```bash
 docker run -p 9090:9090 <your-turtlesim-image>
 ```
@@ -97,15 +153,55 @@ docker run -p 9090:9090 <your-turtlesim-image>
 python -c "from execution.ros_connection import check_ros_connection; print('ROS OK' if check_ros_connection() else 'ROS FAILED')"
 ```
 
-You should see: `ROS OK`
+Expected output: `ROS OK`
+
+---
+
+## Claude Skills Setup
+
+This project uses Claude Skills for AI-driven BT generation. Two generic skills must be installed in your user skills directory.
+
+### Install Generic Skills
+
+Copy the generic skills to `~/.claude/skills/`:
+
+```bash
+# From your local copy of the skills
+cp -r /path/to/bt-composer ~/.claude/skills/
+cp -r /path/to/bt-validator ~/.claude/skills/
+```
+
+Or create symlinks (recommended for development):
+
+```bash
+ln -s /path/to/shared/bt-composer ~/.claude/skills/bt-composer
+ln -s /path/to/shared/bt-validator ~/.claude/skills/bt-validator
+```
+
+### Verify Installation
+
+Check that skills are available:
+
+```bash
+ls ~/.claude/skills/
+# Should show: bt-composer  bt-validator
+```
+
+### Project-Specific Skill
+
+The `bt-action-discovery` skill is project-specific and lives in `./skills/bt-action-discovery/`. It reads the project's `action_library.yaml` to discover available robot actions.
 
 ---
 
 ## Quick Start
 
-### Run a Manual Example
+### 1. Set Up Claude Skills
 
-Try the hand-crafted square drawing example:
+Follow [Claude Skills Setup](#claude-skills-setup) above.
+
+### 2. Run a Manual Example
+
+Test the system with a hand-crafted example:
 
 ```bash
 python execution/run_bt.py bt_library/manual_examples/draw_square.py
@@ -114,14 +210,26 @@ python execution/run_bt.py bt_library/manual_examples/draw_square.py
 You should see:
 - Tree structure printed
 - Tick-by-tick execution log
-- Turtle drawing a blue square in the simulator
+- Turtle drawing a blue square
 
-### Run Another Example
+### 3. Generate BT with Claude
 
-Try the patrol example:
+Ask Claude Code:
+```
+"Generate a behavior tree to draw a red circle"
+```
+
+Claude will:
+1. Invoke bt-composer skill
+2. Discover available actions
+3. Generate `generated_bts/draw_red_circle.py`
+4. Validate the BT
+5. Present execution command
+
+### 4. Execute Generated BT
 
 ```bash
-python execution/run_bt.py bt_library/manual_examples/patrol_waypoints.py
+python execution/run_bt.py generated_bts/draw_red_circle.py
 ```
 
 ---
@@ -132,52 +240,46 @@ python execution/run_bt.py bt_library/manual_examples/patrol_waypoints.py
 bt-composition-prototype/
 ├── README.md                   # This file
 ├── requirements.txt            # Python dependencies
-├── .gitignore                  # Git ignore rules
 │
-├── skills/                     # Claude Skills (for MCP integration)
-│   └── bt-composer/
-│       ├── SKILL.md            # Main skill documentation for Claude
-│       └── action_library.yaml # Catalog of available actions
+├── skills/                     # Project-specific Claude Skill
+│   └── bt-action-discovery/
+│       └── SKILL.md            # Discovers robot actions from YAML
 │
-├── bt_library/                 # Hand-crafted baseline behavior trees
-│   ├── __init__.py
+├── action_library.yaml         # Available actions & constraints
+│
+├── validation/                 # BT validation tools
+│   ├── orchestrator.py         # 3-tier validation coordinator
+│   ├── syntax_checker.py       # Tier 1: Syntax & structure
+│   └── ros_checker.py          # Tier 1: Action existence
+│
+├── bt_library/                 # Hand-crafted baseline BTs
 │   └── manual_examples/
-│       ├── draw_square.py      # Example: Draw a square
-│       └── patrol_waypoints.py # Example: Patrol between waypoints
+│       ├── draw_square.py
+│       └── patrol_waypoints.py
 │
-├── generated_bts/              # Agent-generated BTs (gitignored)
-│   ├── .gitkeep
-│   └── README.md
+├── generated_bts/              # AI-generated BTs (gitignored)
+│   └── .gitkeep
 │
-├── py_trees_nodes/             # Behavior tree node implementations
-│   ├── __init__.py
-│   ├── base_action.py          # Base class for action nodes
-│   ├── primitives/             # Atomic action nodes
-│   │   ├── __init__.py
-│   │   ├── goto_pose.py        # Navigate to position
-│   │   ├── set_pen.py          # Control pen settings
-│   │   ├── move_distance.py    # Move fixed distance
-│   │   ├── get_pose.py         # Read current position (sensing)
-│   │   └── check_bounds.py     # Verify in bounds (condition)
-│   └── composites/             # Compositional action nodes
-│       ├── __init__.py
-│       ├── draw_shape.py       # Draw geometric shapes
-│       └── patrol_waypoints.py # Visit multiple waypoints
-│
-├── validation/                 # BT validation utilities
-│   ├── __init__.py
-│   ├── syntax_checker.py       # Python AST validation
-│   └── ros_checker.py          # ROS dependency checking
+├── py_trees_nodes/             # BT node implementations
+│   ├── primitives/             # Atomic actions
+│   │   ├── goto_pose.py
+│   │   ├── set_pen.py
+│   │   ├── move_distance.py
+│   │   ├── get_pose.py
+│   │   └── check_bounds.py
+│   └── composites/             # Compositional actions
+│       ├── draw_shape.py
+│       └── patrol_waypoints.py
 │
 ├── execution/                  # BT execution engine
-│   ├── __init__.py
-│   ├── run_bt.py              # Main executor script
-│   └── ros_connection.py      # Rosbridge connection management
+│   ├── run_bt.py              # Main executor
+│   └── ros_connection.py      # Rosbridge connection
 │
-└── tests/                      # Tests (basic)
-    ├── test_manual_bts.py
-    └── test_nodes.py
+└── tests/                      # Tests
+    └── ...
 ```
+
+**Note:** Generic Claude Skills (`bt-composer`, `bt-validator`) live in `~/.claude/skills/`, not in this repository.
 
 ---
 
@@ -185,118 +287,132 @@ bt-composition-prototype/
 
 ### Primitive Actions
 
-| Action | Purpose | Key Parameters |
-|--------|---------|----------------|
-| **GoToPose** | Navigate to position | `x, y, theta` |
+| Action | Purpose | Parameters |
+|--------|---------|------------|
+| **GoToPose** | Navigate to position | `x, y, theta, tolerance_pos, tolerance_angle` |
 | **SetPen** | Configure pen | `r, g, b, width, off` |
 | **PenUp** | Disable drawing | - |
 | **PenDown** | Enable drawing | `r, g, b, width` |
 | **MoveDistance** | Move fixed distance | `distance, speed` |
-| **GetPose** | Read position (sensing) | `blackboard_key` |
-| **CheckBounds** | Verify safe zone (condition) | `min_x, max_x, min_y, max_y` |
+| **GetPose** | Read position | `blackboard_key` |
+| **CheckBounds** | Verify safe zone | `min_x, max_x, min_y, max_y` |
 
 ### Compositional Actions
 
-| Action | Purpose | Key Parameters |
-|--------|---------|----------------|
-| **DrawShape** | Draw circle/square/triangle | `shape_type, size, center_x, center_y, color` |
+| Action | Purpose | Parameters |
+|--------|---------|------------|
+| **DrawShape** | Draw circle/square/triangle | `shape_type, size, center_x, center_y, color, width` |
 | **PatrolWaypoints** | Navigate multiple waypoints | `waypoints, loop` |
 
-### py_trees Composites
+### Workspace Constraints
 
-- **Sequence**: Execute children in order (AND logic)
-- **Selector**: Try alternatives until success (OR logic)
-- **Parallel**: Execute children concurrently
+- **Coordinates**: x=[0,11], y=[0,11]
+- **Safe zone** (recommended): x=[1,10], y=[1,10]
+- **Colors**: RGB values [0-255]
+- **Default spawn**: (5.544445, 5.544445)
 
-See `skills/bt-composer/action_library.yaml` for complete reference.
+See `action_library.yaml` for complete reference.
 
 ---
 
 ## Usage Guide
 
-### 1. Create a Behavior Tree
+### Option 1: AI-Generated BTs (Recommended)
 
-**Option A: Manual Creation**
+Ask Claude Code:
+```
+"Draw a blue square with side length 3"
+```
 
-Create a Python file in `bt_library/manual_examples/`:
+Claude will invoke `bt-composer` skill and:
+1. Discover available actions
+2. Generate Python BT file
+3. Validate (3-tier validation)
+4. Present execution command
+
+### Option 2: Manual BT Creation
+
+Create a Python file following this structure:
 
 ```python
 import py_trees
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 from py_trees_nodes.primitives import GoToPose, SetPen
+from py_trees_nodes.composites import DrawShape
 
-def create_root():
-    root = py_trees.composites.Sequence(name="MyTask", memory=False)
 
-    set_pen = SetPen(name="SetRed", r=255, g=0, b=0, width=3)
-    move = GoToPose(name="Move", x=7.0, y=7.0)
+def create_root() -> py_trees.behaviour.Behaviour:
+    """Create the behavior tree root node."""
 
-    root.add_children([set_pen, move])
+    root = py_trees.composites.Sequence(name="MyTask", memory=True)
+
+    # Add your actions
+    circle = DrawShape(
+        name="Circle",
+        shape_type="circle",
+        size=2.0,
+        center_x=5.5,
+        center_y=5.5,
+        color=(255, 0, 0),
+        width=3
+    )
+
+    root.add_children([circle])
     return root
+
+
+if __name__ == '__main__':
+    print("Creating behavior tree...")
+    root = create_root()
+    print(py_trees.display.unicode_tree(root, show_status=True))
 ```
 
-**Option B: Claude Generation**
-
-1. Ensure Claude has access to the `bt-composer` skill
-2. Ask Claude: "Generate a behavior tree to draw a triangle"
-3. Claude will create a file in `generated_bts/`
-
-### 2. Validate (Optional)
-
-Check syntax:
-```bash
-python validation/syntax_checker.py path/to/your_bt.py
-```
-
-Check ROS dependencies:
-```bash
-python validation/ros_checker.py path/to/your_bt.py
-```
-
-### 3. Execute
+### Execute BT
 
 ```bash
 python execution/run_bt.py path/to/your_bt.py
 ```
 
-The script will:
-- Connect to ROS (rosbridge at localhost:9090)
-- Load and setup the behavior tree
-- Execute with 10 Hz tick rate
-- Display tree structure and status updates
-- Timeout after 1000 ticks if not completed
-
 ---
 
 ## Validation
 
-### Syntax Checker
+### 3-Tier Validation System
 
-Validates:
-- Python syntax (AST parsing)
-- Required imports present
+**Tier 1: Critical (Must Pass)**
+- Valid Python syntax
 - `create_root()` function exists
-- Function returns a node
+- All imports available
+- All actions exist in action library
 
-Usage:
+**Tier 2: Important (Should Pass)**
+- Parameters within valid ranges
+- Required parameters provided
+- Correct parameter types
+
+**Tier 3: Advisory**
+- Reasonable action ordering
+- No obvious infinite loops
+- Best practice adherence
+
+### Run Validation
+
 ```bash
+# Full validation (all tiers)
+python validation/orchestrator.py generated_bts/my_bt.py
+
+# Syntax only
 python validation/syntax_checker.py generated_bts/my_bt.py
-```
 
-### ROS Checker
-
-Validates:
-- Action nodes are in library
-- ROS topics/services required
-- Optional: Live ROS availability check
-
-Usage:
-```bash
-# Basic check
+# ROS dependencies only
 python validation/ros_checker.py generated_bts/my_bt.py
-
-# With live ROS check
-python validation/ros_checker.py generated_bts/my_bt.py --check-live
 ```
+
+**Note:** Claude automatically validates during BT generation.
 
 ---
 
@@ -304,125 +420,65 @@ python validation/ros_checker.py generated_bts/my_bt.py --check-live
 
 ### Example 1: Draw a Square
 
-See `bt_library/manual_examples/draw_square.py`
-
-**What it does**:
-- Sets pen to blue
-- Navigates to 5 corners to draw a 2x2 square
-
-**Run**:
 ```bash
 python execution/run_bt.py bt_library/manual_examples/draw_square.py
 ```
 
+**What it does:**
+- Sets pen to red
+- Navigates to 5 corners to draw a 2x2 square
+
 ### Example 2: Patrol Waypoints
 
-See `bt_library/manual_examples/patrol_waypoints.py`
-
-**What it does**:
-- Reads current position
-- Checks bounds
-- Patrols through 4 waypoints in a rectangle
-- Returns to start
-
-**Run**:
 ```bash
 python execution/run_bt.py bt_library/manual_examples/patrol_waypoints.py
 ```
 
-### Example 3: Using Compositional Nodes
+**What it does:**
+- Reads current position
+- Checks bounds
+- Patrols through 4 waypoints
+- Returns to start
 
-```python
-from py_trees_nodes.composites import DrawShape
+### Example 3: AI-Generated
 
-def create_root():
-    root = py_trees.composites.Sequence(name="DrawCircle", memory=False)
-
-    circle = DrawShape(
-        name="DrawGreenCircle",
-        shape_type='circle',
-        size=2.0,
-        center_x=5.5,
-        center_y=5.5,
-        color=(0, 255, 0),
-        width=3
-    )
-
-    root.add_child(circle)
-    return root
+Ask Claude:
 ```
+"Draw a smiley face"
+```
+
+Claude will generate a BT using composite actions and patterns.
 
 ---
 
 ## Troubleshooting
 
-### Issue: "Failed to connect to ROS"
+### "Failed to connect to ROS"
 
-**Solution**:
-- Verify rosbridge is running: `curl http://localhost:9090`
-- Check Docker container is up
-- Ensure port 9090 is not blocked
+**Solution:**
+- Verify rosbridge: `curl http://localhost:9090`
+- Check Docker container is running
+- Ensure port 9090 is accessible
 
-### Issue: "Turtle not moving"
+### "Skill not found: bt-composer"
 
-**Solution**:
-- Verify turtlesim node is running in ROS
+**Solution:**
+- Install skills: See [Claude Skills Setup](#claude-skills-setup)
+- Verify: `ls ~/.claude/skills/` shows `bt-composer` and `bt-validator`
+
+### "Validation failed"
+
+**Solution:**
+- Check validation output for specific errors
+- See validation-reference.md in bt-validator skill for error catalog
+- Ask Claude to debug: "Validate my_bt.py and fix errors"
+
+### "Turtle not moving"
+
+**Solution:**
+- Verify turtlesim is running in ROS
 - Check `/turtle1/cmd_vel` topic exists
-- Ensure turtle hasn't hit bounds (reset with ROS service)
-
-### Issue: "Syntax check failed"
-
-**Solution**:
-- Check Python syntax in generated file
-- Ensure all imports are present
-- Verify `create_root()` function exists
-
-### Issue: "Behavior tree timeout"
-
-**Solution**:
-- Increase `max_ticks` in `run_bt.py` (default: 1000)
-- Check if turtle is stuck (reset simulation)
-- Verify target positions are reachable
-
----
-
-## Next Steps
-
-### Phase 2: Agent-Driven Generation
-
-- Integrate with Claude via ros-mcp-server
-- Automatic validation before execution
-- Error feedback loop for regeneration
-
-### Phase 3: Learning from Execution
-
-- Capture execution traces
-- Analyze success/failure patterns
-- Refine action library based on outcomes
-
-### Extensions
-
-- Add more primitive actions (rotate, wait, etc.)
-- Implement decorators (retry, timeout, etc.)
-- Support for multiple turtles
-- Real robot deployment (beyond turtlesim)
-
----
-
-## Contributing
-
-This is a research prototype. Suggested improvements:
-
-1. **More action nodes** - Add domain-specific primitives
-2. **Better validation** - Deeper semantic checks
-3. **Execution monitoring** - Real-time visualization
-4. **Error recovery** - Automatic retry strategies
-
----
-
-## License
-
-Research prototype - adjust as needed for your project.
+- Reset turtle if stuck: Use ROS service call
 
 ---
 
@@ -431,12 +487,37 @@ Research prototype - adjust as needed for your project.
 - **py_trees documentation**: https://py-trees.readthedocs.io/
 - **ROS2 Turtlesim**: https://docs.ros.org/en/humble/Tutorials/Beginner-CLI-Tools/Introducing-Turtlesim/Introducing-Turtlesim.html
 - **roslibpy**: https://roslibpy.readthedocs.io/
+- **Claude Code**: https://claude.com/claude-code
 
 ---
 
-## Contact
+## Team Setup
 
-For questions about this prototype, refer to the project documentation or consult the behavior tree skill file at `skills/bt-composer/SKILL.md`.
+For team members:
+
+1. **Clone repository**
+   ```bash
+   git clone <repo-url>
+   cd bt-composition-prototype
+   pip install -r requirements.txt
+   ```
+
+2. **Install Claude Skills**
+   ```bash
+   # Copy or symlink shared skills
+   cp -r /shared/location/bt-composer ~/.claude/skills/
+   cp -r /shared/location/bt-validator ~/.claude/skills/
+   ```
+
+3. **Start ROS environment**
+   ```bash
+   docker run -p 9090:9090 <turtlesim-image>
+   ```
+
+4. **Test**
+   ```bash
+   python execution/run_bt.py bt_library/manual_examples/draw_square.py
+   ```
 
 ---
 

@@ -1,0 +1,254 @@
+================================================================================
+CLAUDE CODE WORKFLOW: BT COMPOSITION & VALIDATION
+================================================================================
+
+USER REQUEST: "Draw a red circle"
+        |
+        v
+┌───────────────────────────────────────────────────────────────────────────┐
+│                           CLAUDE CODE                                      │
+│                                                                            │
+│  Invokes: bt-composer skill                                                │
+└───────────────────────────────────────────────────────────────────────────┘
+        |
+        v
+┌───────────────────────────────────────────────────────────────────────────┐
+│                      BT-COMPOSER SKILL                                     │
+│  (skills/bt-composer/SKILL.md)                                             │
+│                                                                            │
+│  Step 1: Discover Available Actions                                        │
+│  ┌─────────────────────────────────────────────────────────────┐          │
+│  │  Invoke: bt-action-discovery skill                          │          │
+│  │  ┌───────────────────────────────────────────────────────┐ │          │
+│  │  │  BT-ACTION-DISCOVERY SKILL                            │ │          │
+│  │  │  Reads: skills/bt-composer/action_library.yaml        │ │          │
+│  │  │  Returns: Available actions, parameters, constraints  │ │          │
+│  │  └───────────────────────────────────────────────────────┘ │          │
+│  └─────────────────────────────────────────────────────────────┘          │
+│         |                                                                  │
+│         | Actions: DrawShape, GoToPose, SetPen, etc.                       │
+│         v                                                                  │
+│  Step 2: Understand Task                                                   │
+│         - Parse: "Draw a red circle"                                       │
+│         - Plan: Use DrawShape(circle, red)                                 │
+│         |                                                                  │
+│         v                                                                  │
+│  Step 3: Generate BT Code                                                  │
+│         - Uses template from SKILL.md                                      │
+│         - May reference: generation-patterns.md (if needed)                │
+│         - Writes: generated_bts/draw_red_circle.py                         │
+│         |                                                                  │
+│         v                                                                  │
+│  Step 4: Validate                                                          │
+│  ┌─────────────────────────────────────────────────────────────┐          │
+│  │  Bash: python validation/orchestrator.py \                 │          │
+│  │        generated_bts/draw_red_circle.py                     │          │
+│  │                                                              │          │
+│  │  ┌────────────────────────────────────────────────────────┐│          │
+│  │  │ VALIDATION/ORCHESTRATOR.PY                             ││          │
+│  │  │                                                         ││          │
+│  │  │  Runs Tier 1: Critical Checks                          ││          │
+│  │  │  ┌──────────────────────────────────────────────────┐ ││          │
+│  │  │  │ validation/syntax_checker.py                     │ ││          │
+│  │  │  │  - Valid Python syntax?                          │ ││          │
+│  │  │  │  - create_root() exists?                         │ ││          │
+│  │  │  │  - Returns Behaviour?                            │ ││          │
+│  │  │  │  - Imports valid?                                │ ││          │
+│  │  │  └──────────────────────────────────────────────────┘ ││          │
+│  │  │  ┌──────────────────────────────────────────────────┐ ││          │
+│  │  │  │ validation/ros_checker.py                        │ ││          │
+│  │  │  │  - All actions exist in action library?          │ ││          │
+│  │  │  │  - Valid package imports?                        │ ││          │
+│  │  │  └──────────────────────────────────────────────────┘ ││          │
+│  │  │                                                         ││          │
+│  │  │  Runs Tier 2: Important Checks                         ││          │
+│  │  │  - Parameters in valid ranges?                         ││          │
+│  │  │  - Required params provided?                           ││          │
+│  │  │  - Correct types?                                      ││          │
+│  │  │                                                         ││          │
+│  │  │  Runs Tier 3: Advisory Checks                          ││          │
+│  │  │  - Reasonable ordering?                                ││          │
+│  │  │  - No infinite loops?                                  ││          │
+│  │  │                                                         ││          │
+│  │  │  Returns JSON:                                          ││          │
+│  │  │  {                                                      ││          │
+│  │  │    "valid": true/false,                                ││          │
+│  │  │    "tier1_critical": {...},                            ││          │
+│  │  │    "tier2_important": {...},                           ││          │
+│  │  │    "tier3_advisory": {...}                             ││          │
+│  │  │  }                                                      ││          │
+│  │  └────────────────────────────────────────────────────────┘│          │
+│  └─────────────────────────────────────────────────────────────┘          │
+│         |                                                                  │
+│         v                                                                  │
+│  Step 5: Handle Validation Results                                         │
+│         - Parse JSON output                                                │
+│         - Tier 1 FAIL? → Regenerate (max 3x)                               │
+│         - Tier 2 WARN? → Fix if possible                                   │
+│         - All pass? → Present to user                                      │
+└───────────────────────────────────────────────────────────────────────────┘
+        |
+        | BT validated and ready
+        v
+┌───────────────────────────────────────────────────────────────────────────┐
+│                           CLAUDE CODE                                      │
+│                                                                            │
+│  Presents to user:                                                         │
+│  - Summary: "Created BT to draw red circle"                                │
+│  - File: generated_bts/draw_red_circle.py                                  │
+│  - How to run: python execution/run_bt.py generated_bts/draw_red_circle.py│
+│  - Tree structure visualization                                            │
+└───────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+ALTERNATIVE WORKFLOW: DEBUGGING EXISTING BT
+================================================================================
+
+USER REQUEST: "My BT in draw_square.py isn't working"
+        |
+        v
+┌───────────────────────────────────────────────────────────────────────────┐
+│                           CLAUDE CODE                                      │
+│                                                                            │
+│  Invokes: bt-validator skill                                               │
+└───────────────────────────────────────────────────────────────────────────┘
+        |
+        v
+┌───────────────────────────────────────────────────────────────────────────┐
+│                      BT-VALIDATOR SKILL                                    │
+│  (skills/bt-validator/SKILL.md)                                            │
+│                                                                            │
+│  Step 1: Discover Available Actions                                        │
+│  ┌─────────────────────────────────────────────────────────────┐          │
+│  │  Invoke: bt-action-discovery skill                          │          │
+│  │  Returns: Valid actions to check against                    │          │
+│  └─────────────────────────────────────────────────────────────┘          │
+│         |                                                                  │
+│         v                                                                  │
+│  Step 2: Run Validation                                                    │
+│  ┌─────────────────────────────────────────────────────────────┐          │
+│  │  Bash: python validation/orchestrator.py \                 │          │
+│  │        generated_bts/draw_square.py                         │          │
+│  │                                                              │          │
+│  │  Returns: JSON with tier1/tier2/tier3 results               │          │
+│  └─────────────────────────────────────────────────────────────┘          │
+│         |                                                                  │
+│         v                                                                  │
+│  Step 3: Parse Results                                                     │
+│         - Check tier levels                                                │
+│         - Identify specific errors                                         │
+│         |                                                                  │
+│         v                                                                  │
+│  Step 4: Diagnose Errors                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐          │
+│  │  Read: validation-reference.md (external reference)         │          │
+│  │  - Error catalog                                             │          │
+│  │  - Fixes for common errors                                   │          │
+│  │  - Troubleshooting guide                                     │          │
+│  └─────────────────────────────────────────────────────────────┘          │
+│         |                                                                  │
+│         v                                                                  │
+│  Step 5: Provide Fixes                                                     │
+│         - Explain what's wrong                                             │
+│         - Show correct vs incorrect code                                   │
+│         - Suggest fixes based on tier level                                │
+└───────────────────────────────────────────────────────────────────────────┘
+        |
+        v
+┌───────────────────────────────────────────────────────────────────────────┐
+│                           CLAUDE CODE                                      │
+│                                                                            │
+│  Presents to user:                                                         │
+│  - Validation errors found                                                 │
+│  - Specific fixes needed                                                   │
+│  - Example corrections                                                     │
+└───────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+COMPONENT RELATIONSHIPS
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          CLAUDE SKILLS                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌────────────────────┐       ┌────────────────────┐                   │
+│  │ bt-action-discovery│◄──────│   bt-composer      │                   │
+│  │  (58 lines)        │       │   (172 lines)      │                   │
+│  │                    │       │                    │                   │
+│  │ Reads:             │       │ References:        │                   │
+│  │ action_library.yaml│       │ generation-        │                   │
+│  └────────────────────┘       │ patterns.md        │                   │
+│           ▲                   └────────────────────┘                   │
+│           │                            │                                │
+│           │                            │ Calls validation               │
+│           │                            ▼                                │
+│  ┌────────┴───────────┐       ┌────────────────────┐                   │
+│  │  bt-validator      │       │  validation/       │                   │
+│  │  (196 lines)       │──────►│  orchestrator.py   │                   │
+│  │                    │ Bash  │                    │                   │
+│  │ References:        │       │ Calls:             │                   │
+│  │ validation-        │       │ - syntax_checker.py│                   │
+│  │ reference.md       │       │ - ros_checker.py   │                   │
+│  └────────────────────┘       └────────────────────┘                   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       EXTERNAL REFERENCES                                │
+│                    (Progressive Disclosure)                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  generation-patterns.md (308 lines)                                      │
+│  - py_trees composite patterns                                           │
+│  - Common BT patterns                                                    │
+│  - Validation tiers detail                                               │
+│  - Error examples                                                        │
+│  └─ Loaded only when: bt-composer needs detailed pattern guidance       │
+│                                                                          │
+│  validation-reference.md (477 lines)                                     │
+│  - Complete error catalog                                                │
+│  - Troubleshooting guide                                                 │
+│  - Individual validator usage                                            │
+│  └─ Loaded only when: bt-validator needs to diagnose errors             │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       PYTHON VALIDATION TOOLS                            │
+│                    (External, not part of skills)                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  validation/orchestrator.py                                              │
+│  ├─ Coordinates all validation tiers                                     │
+│  ├─ Returns JSON results                                                 │
+│  └─ Calls:                                                               │
+│      ├─ validation/syntax_checker.py (Tier 1)                            │
+│      ├─ validation/ros_checker.py (Tier 1)                               │
+│      └─ Internal constraint checks (Tier 2, 3)                           │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+KEY DESIGN PRINCIPLES
+================================================================================
+
+1. PROGRESSIVE DISCLOSURE
+        - SKILL.md files are concise (58-196 lines)
+        - External .md files loaded only when needed
+        - Reduces context window usage
+
+2. SEPARATION OF CONCERNS
+        - Skills = workflow orchestration
+        - Python scripts = validation logic
+        - External references = detailed guidance
+
+3. ROBOT-AGNOSTIC
+        - bt-action-discovery abstracts robot capabilities
+        - Currently reads YAML
+        - Future: query live robot
+
+4. MODULARITY
+        - Each skill has clear, single responsibility
+        - Can be invoked independently or together
+        - External references self-contained

@@ -1,6 +1,9 @@
 # Action Library for ROS Turtlesim Behavior Trees
 # This catalog lists all available action nodes for composing behavior trees
 
+# This file is hardcoded for now in `bt-composer`, but ultimately it will be fetched via the ros-mcp-server.
+# We'll engineer this to be equivalent to the actions/skills expressed in a manifest file.
+
 primitives:
   GoToPose:
     description: "Move the turtle to a target position and orientation"
