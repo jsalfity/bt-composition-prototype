@@ -1,0 +1,273 @@
+# Validation Rules for Behavior Tree Validator
+# Referenced by bt-validator skill
+
+# Tier 1: Critical (Must Pass)
+tier1_critical:
+  syntax_rules:
+    - id: "python_syntax_valid"
+      description: "BT file must be valid Python code"
+      check: "ast.parse(bt_code)"
+      severity: "critical"
+      error_message: "Syntax error in Python code"
+    
+    - id: "has_create_bt_function"
+      description: "Must have create_behavior_tree() function"
+      check: "function_exists('create_behavior_tree')"
+      severity: "critical"
+      error_message: "Missing create_behavior_tree() function"
+    
+    - id: "returns_behaviour_object"
+      description: "create_behavior_tree() must return py_trees.behaviour.Behaviour"
+      check: "return_type_check"
+      severity: "critical"
+      error_message: "Function must return a Behaviour object"
+    
+    - id: "imports_valid"
+      description: "All imports must be available"
+      check: "import_check"
+      severity: "critical"
+      required_imports:
+        - "py_trees"
+      error_message: "Missing required import: {import_name}"
+  
+  action_existence_rules:
+    - id: "actions_exist_in_ros"
+      description: "All action nodes must exist in ROS2"
+      check: "ros_mcp_action_query"
+      severity: "critical"
+      error_message: "Action node '{action_name}' does not exist in ROS"
+      instructions: "Use ros-mcp-server get_actions() to verify"
+    
+    - id: "node_classes_imported"
+      description: "Action node classes must be imported"
+      check: "import_verification"
+      severity: "critical"
+      error_message: "Action class '{class_name}' not imported"
+
+# Tier 2: Important (Should Pass)
+tier2_important:
+  parameter_rules:
+    - id: "parameters_within_bounds"
+      description: "Action parameters must be within valid ranges"
+      check: "parameter_range_check"
+      severity: "important"
+      error_message: "Parameter '{param}' value {value} outside valid range {range}"
+    
+    - id: "required_params_present"
+      description: "All required parameters must be provided"
+      check: "required_param_check"
+      severity: "important"
+      error_message: "Missing required parameter '{param}' for action '{action}'"
+    
+    - id: "param_types_correct"
+      description: "Parameter types must match expected types"
+      check: "type_check"
+      severity: "important"
+      error_message: "Parameter '{param}' expected type {expected}, got {actual}"
+  
+  constraint_rules:
+    - id: "spatial_constraints"
+      description: "Spatial parameters must satisfy domain constraints"
+      check: "spatial_constraint_check"
+      severity: "important"
+      constraints:
+        - "x in [0, 11]"
+        - "y in [0, 11]"
+        - "theta in [-π, π]"
+      error_message: "Spatial constraint violated: {constraint}"
+    
+    - id: "preconditions_satisfied"
+      description: "Action preconditions must be satisfied"
+      check: "precondition_check"
+      severity: "important"
+      error_message: "Precondition '{precondition}' not satisfied for action '{action}'"
+      examples:
+        - "SetPenNode requires turtle_exists"
+        - "DrawShapeNode requires pen_configured"
+    
+    - id: "effects_reasonable"
+      description: "Action effects should follow logical sequence"
+      check: "effect_sequence_check"
+      severity: "important"
+      error_message: "Effect '{effect}' conflicts with previous state"
+
+# Tier 3: Advisory (Nice to Have)
+tier3_advisory:
+  semantic_rules:
+    - id: "no_infinite_loops"
+      description: "Check for obvious infinite loops"
+      check: "llm_judge_infinite_loop"
+      severity: "advisory"
+      warning_message: "Potential infinite loop detected at line {line}"
+      llm_check: true
+    
+    - id: "no_unreachable_code"
+      description: "Check for unreachable behavior tree branches"
+      check: "llm_judge_unreachable"
+      severity: "advisory"
+      warning_message: "Unreachable code detected: {description}"
+      llm_check: true
+    
+    - id: "reasonable_action_order"
+      description: "Actions should be in logical order"
+      check: "llm_judge_ordering"
+      severity: "advisory"
+      warning_message: "Action ordering may be suboptimal: {suggestion}"
+      llm_check: true
+      examples:
+        - "SetPenNode should come before drawing actions"
+        - "GetPoseNode should precede conditional navigation"
+    
+    - id: "no_redundant_actions"
+      description: "Check for unnecessarily repeated actions"
+      check: "llm_judge_redundancy"
+      severity: "advisory"
+      warning_message: "Redundant action detected: {description}"
+      llm_check: true
+  
+  optimization_rules:
+    - id: "efficient_tree_structure"
+      description: "BT structure should be reasonably efficient"
+      check: "llm_judge_efficiency"
+      severity: "advisory"
+      warning_message: "Tree structure could be more efficient: {suggestion}"
+      llm_check: true
+    
+    - id: "appropriate_composition"
+      description: "Use appropriate composites (Sequence, Selector, Parallel)"
+      check: "llm_judge_composition"
+      severity: "advisory"
+      warning_message: "Consider using {composite_type} instead of {current_type}"
+      llm_check: true
+
+# LLM-as-Judge configuration
+llm_judge_config:
+  enabled: true
+  model: "claude-sonnet-4"
+  prompt_template: |
+    You are validating a behavior tree for semantic consistency.
+    
+    Task: {task_description}
+    Domain: {domain_name}
+    
+    Generated BT:
+    ```python
+    {bt_code}
+    ```
+    
+    Domain constraints:
+    {domain_constraints}
+    
+    Check for:
+    1. **Infinite loops**: Are there loops that never terminate?
+    2. **Unreachable code**: Are there branches that can never execute?
+    3. **Action ordering**: Are actions in logical sequence?
+    4. **Redundancy**: Are actions unnecessarily repeated?
+    5. **Efficiency**: Could the tree structure be simplified?
+    
+    Return JSON:
+    {{
+      "has_issues": bool,
+      "issues": [
+        {{
+          "type": "infinite_loop|unreachable|ordering|redundancy|efficiency",
+          "line": int or null,
+          "severity": "advisory",
+          "description": "What's wrong",
+          "suggestion": "How to fix"
+        }}
+      ]
+    }}
+  
+  retry_on_invalid_json: true
+  max_retries: 2
+
+# Validation workflow configuration
+workflow:
+  validate_on_generation: true
+  max_regeneration_attempts: 3
+  fail_fast: false  # Continue to next tier even if previous fails
+  
+  tier_execution_order:
+    - "tier1_critical"
+    - "tier2_important"
+    - "tier3_advisory"
+  
+  stopping_conditions:
+    - condition: "tier1_critical_failed"
+      action: "stop_and_report"
+    - condition: "tier2_important_failed"
+      action: "warn_and_continue"
+    - condition: "tier3_advisory_failed"
+      action: "log_and_continue"
+
+# Error message templates
+error_templates:
+  syntax_error: |
+    ❌ **Syntax Error** (Line {line})
+    {error_message}
+    
+    Fix: {suggestion}
+  
+  action_not_found: |
+    ❌ **Action Not Found**
+    Action '{action_name}' does not exist in ROS2.
+    
+    Available actions: {available_actions}
+    Did you mean: {closest_match}?
+  
+  constraint_violation: |
+    ⚠️ **Constraint Violation**
+    {constraint_description}
+    
+    Found: {actual_value}
+    Expected: {expected_range}
+    
+    Fix: {suggestion}
+  
+  semantic_issue: |
+    💡 **Advisory: {issue_type}**
+    {description}
+    
+    Suggestion: {suggestion}
+
+# Validation metrics (for research)
+metrics_to_track:
+  - "validation_time_ms"
+  - "tier1_pass_rate"
+  - "tier2_pass_rate"
+  - "tier3_issues_count"
+  - "regeneration_attempts"
+  - "llm_judge_accuracy"
+  - "false_positive_rate"
+  - "false_negative_rate"
+
+# Common fix suggestions
+fix_suggestions:
+  missing_import:
+    - "Add 'from py_trees_nodes.primitives import {node_class}' to imports"
+    - "Verify node class name matches file in py_trees_nodes/"
+  
+  parameter_out_of_bounds:
+    - "Adjust {param} to be within range {range}"
+    - "Check domain configuration for valid parameter ranges"
+  
+  action_not_found:
+    - "Query available actions using ros-mcp-server get_actions()"
+    - "Check if action is implemented in py_trees_nodes/"
+    - "Verify ROS2 action server is running"
+  
+  infinite_loop:
+    - "Add termination condition to while/for loop"
+    - "Use Decorator with timeout: py_trees.decorators.Timeout()"
+    - "Ensure loop counter or condition eventually becomes false"
+  
+  unreachable_code:
+    - "Check conditions in Selector/Sequence composites"
+    - "Ensure fallback logic is correctly structured"
+    - "Remove dead code branches"
+
+# Integration with domain configs
+domain_config_path: "skills/bt-composer/{domain_name}_domain.yaml"
+load_constraints_from_domain: true
+override_with_skill_rules: false  # Domain config takes precedence
