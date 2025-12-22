@@ -53,7 +53,7 @@ This prototype demonstrates AI-driven behavior tree composition with validation:
 │                                                                      │
 │  Step 1: Discover Actions                                           │
 │    ├─> Invokes: bt-action-discovery skill                           │
-│    │     └─> Reads: ./skills/action_library.yaml                    │
+│    │     └─> Reads: ./action_library/action_library.yaml            │
 │    └─> Returns: Available actions & constraints                     │
 │                                                                      │
 │  Step 2: Generate BT                                                 │
@@ -96,7 +96,7 @@ This prototype demonstrates AI-driven behavior tree composition with validation:
 │                    │ invokes│    ├─ syntax_checker.py              │
 └────────────────────┘        │    └─ ros_checker.py                 │
                               │                                       │
-                              │  action_library.yaml                 │
+                              │  action_library/action_library.yaml  │
                               │  (robot-specific actions)             │
                               └──────────────────────────────────────┘
 ```
@@ -189,7 +189,7 @@ ls ~/.claude/skills/
 
 ### Project-Specific Skill
 
-The `bt-action-discovery` skill is project-specific and lives in `./skills/bt-action-discovery/`. It reads the project's `action_library.yaml` to discover available robot actions.
+The `bt-action-discovery` skill is project-specific and lives in `./skills/bt-action-discovery/`. It reads the project's `action_library/action_library.yaml` to discover available robot actions.
 
 ---
 
@@ -245,7 +245,8 @@ bt-composition-prototype/
 │   └── bt-action-discovery/
 │       └── SKILL.md            # Discovers robot actions from YAML
 │
-├── action_library.yaml         # Available actions & constraints
+├── action_library/             # Available actions & constraints
+│   └── action_library.yaml    # Action definitions & ROS dependencies
 │
 ├── validation/                 # BT validation tools
 │   ├── orchestrator.py         # 3-tier validation coordinator
@@ -311,7 +312,7 @@ bt-composition-prototype/
 - **Colors**: RGB values [0-255]
 - **Default spawn**: (5.544445, 5.544445)
 
-See `action_library.yaml` for complete reference.
+See `action_library/action_library.yaml` for complete reference.
 
 ---
 

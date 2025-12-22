@@ -8,6 +8,9 @@ primitives:
   GoToPose:
     description: "Move the turtle to a target position and orientation"
     package: "py_trees_nodes.primitives"
+    ros_dependencies:
+      topics: ["/turtle1/cmd_vel", "/turtle1/pose"]
+      services: []
     parameters:
       - name: "name"
         type: "str"
@@ -42,6 +45,9 @@ primitives:
   SetPen:
     description: "Configure the turtle's drawing pen (color, width, on/off)"
     package: "py_trees_nodes.primitives"
+    ros_dependencies:
+      topics: []
+      services: ["/turtle1/set_pen"]
     parameters:
       - name: "name"
         type: "str"
@@ -78,6 +84,9 @@ primitives:
   PenUp:
     description: "Convenience action to lift the pen (disable drawing)"
     package: "py_trees_nodes.primitives"
+    ros_dependencies:
+      topics: []
+      services: ["/turtle1/set_pen"]
     parameters:
       - name: "name"
         type: "str"
@@ -90,6 +99,9 @@ primitives:
   PenDown:
     description: "Convenience action to lower the pen (enable drawing)"
     package: "py_trees_nodes.primitives"
+    ros_dependencies:
+      topics: []
+      services: ["/turtle1/set_pen"]
     parameters:
       - name: "name"
         type: "str"
@@ -122,6 +134,9 @@ primitives:
   MoveDistance:
     description: "Move the turtle forward or backward by a specified distance"
     package: "py_trees_nodes.primitives"
+    ros_dependencies:
+      topics: ["/turtle1/cmd_vel", "/turtle1/pose"]
+      services: []
     parameters:
       - name: "name"
         type: "str"
@@ -142,6 +157,9 @@ primitives:
   GetPose:
     description: "Read the current pose of the turtle and store in blackboard"
     package: "py_trees_nodes.primitives"
+    ros_dependencies:
+      topics: ["/turtle1/pose"]
+      services: []
     parameters:
       - name: "name"
         type: "str"
@@ -159,6 +177,9 @@ primitives:
   CheckBounds:
     description: "Check if the turtle is within specified bounds (condition node)"
     package: "py_trees_nodes.primitives"
+    ros_dependencies:
+      topics: ["/turtle1/pose"]
+      services: []
     parameters:
       - name: "name"
         type: "str"
@@ -192,6 +213,9 @@ composites:
   DrawShape:
     description: "High-level action to draw geometric shapes (circle, square, triangle)"
     package: "py_trees_nodes.composites"
+    ros_dependencies:
+      topics: ["/turtle1/cmd_vel", "/turtle1/pose"]
+      services: ["/turtle1/set_pen"]
     parameters:
       - name: "name"
         type: "str"
@@ -236,6 +260,9 @@ composites:
   PatrolWaypoints:
     description: "Navigate through a list of waypoints in sequence"
     package: "py_trees_nodes.composites"
+    ros_dependencies:
+      topics: ["/turtle1/cmd_vel", "/turtle1/pose"]
+      services: []
     parameters:
       - name: "name"
         type: "str"

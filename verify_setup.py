@@ -180,7 +180,7 @@ def check_skill_files():
 
     files = [
         "skills/bt-composer/SKILL.md",
-        "skills/bt-composer/action_library.yaml",
+        "action_library/action_library.yaml",
     ]
 
     all_passed = True

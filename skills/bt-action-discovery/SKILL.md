@@ -5,13 +5,13 @@ description: Discovers available robot actions by reading action_library.yaml. R
 
 ## Purpose
 
-This skill discovers what actions the robot supports. Currently reads from `skills/bt-composer/action_library.yaml`. In the future, this will query the robot's advertised ROS services/actions dynamically.
+This skill discovers what actions the robot supports. Currently reads from `action_library/action_library.yaml`. In the future, this will query the robot's advertised ROS services/actions dynamically.
 
 ---
 
 ## Workflow
 
-1. Read `skills/bt-composer/action_library.yaml`
+1. Read `action_library/action_library.yaml`
 2. Parse available primitive and composite actions
 3. Return structured action catalog
 
