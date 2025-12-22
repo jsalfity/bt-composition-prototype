@@ -3,23 +3,23 @@ Validation orchestrator for behavior trees.
 
 Runs multi-tier validation on generated BT files:
 - Tier 1: Critical (syntax, imports, action existence)
-- Tier 2: Important (parameter constraints, types)
-- Tier 3: Advisory (semantic checks, best practices)
+- Tier 2: Structural (reachability, duplicate names, memory parameters)
+- Tier 3: Semantic (LLM-based validation - reserved for future use)
+
+All validation is domain-agnostic and environment-independent.
 
 Usage:
     python validation/orchestrator.py path/to/bt_file.py [--verbose]
 """
 
 import sys
-import os
 import json
-import ast
-import yaml
 from typing import Dict, List, Tuple, Any
 
 # Import existing validators
 from validation.syntax_checker import BTSyntaxChecker
-from validation.ros_checker import BTROSChecker, KNOWN_ACTIONS
+from validation.ros_checker import BTROSChecker
+from validation.structural_checker import BTStructuralChecker
 
 
 class BTValidationOrchestrator:
@@ -27,21 +27,13 @@ class BTValidationOrchestrator:
     Orchestrates multi-tier validation of behavior tree files.
     """
 
-    def __init__(self, action_library_path: str = None):
+    def __init__(self):
         """
         Initialize the orchestrator.
-
-        Args:
-            action_library_path: Path to action_library.yaml (optional)
         """
         self.syntax_checker = BTSyntaxChecker()
         self.ros_checker = BTROSChecker(check_ros_live=False)
-
-        # Load action library if provided
-        self.action_library = {}
-        if action_library_path and os.path.exists(action_library_path):
-            with open(action_library_path, 'r') as f:
-                self.action_library = yaml.safe_load(f)
+        self.structural_checker = BTStructuralChecker()
 
     def validate(self, file_path: str, verbose: bool = False) -> Dict[str, Any]:
         """
@@ -65,11 +57,11 @@ class BTValidationOrchestrator:
                 "passed": False,
                 "errors": []
             },
-            "tier2_important": {
-                "passed": False,
-                "warnings": []
+            "tier2_structural": {
+                "passed": True,
+                "suggestions": []
             },
-            "tier3_advisory": {
+            "tier3_semantic": {
                 "passed": True,
                 "suggestions": []
             },
@@ -88,34 +80,32 @@ class BTValidationOrchestrator:
             results["summary"] = f"Validation failed with {len(tier1_errors)} critical error(s)"
             return results
 
-        # Tier 2: Important validation (constraint checking)
+        # Tier 2: Structural validation
         if verbose:
-            print("\n[TIER 2] Running constraint validation...")
+            print("\n[TIER 2] Running structural validation...")
 
-        tier2_passed, tier2_warnings = self._validate_tier2(file_path, verbose)
-        results["tier2_important"]["passed"] = tier2_passed
-        results["tier2_important"]["warnings"] = tier2_warnings
+        tier2_suggestions = self._validate_tier2(file_path, verbose)
+        results["tier2_structural"]["suggestions"] = tier2_suggestions
 
-        # Tier 3: Advisory (semantic checks)
+        # Tier 3: Semantic validation (LLM-based, reserved for future)
         if verbose:
-            print("\n[TIER 3] Running advisory checks...")
+            print("\n[TIER 3] Running semantic validation...")
 
         tier3_suggestions = self._validate_tier3(file_path, verbose)
-        results["tier3_advisory"]["suggestions"] = tier3_suggestions
+        results["tier3_semantic"]["suggestions"] = tier3_suggestions
 
-        # Overall validation result
-        results["valid"] = tier1_passed and tier2_passed
+        # Overall validation result (only Tier 1 affects validity)
+        results["valid"] = tier1_passed
 
         # Generate summary
+        total_suggestions = len(tier2_suggestions) + len(tier3_suggestions)
         if results["valid"]:
-            if tier3_suggestions:
-                results["summary"] = f"All validation checks passed ({len(tier3_suggestions)} suggestion(s))"
+            if total_suggestions > 0:
+                results["summary"] = f"All validation checks passed ({total_suggestions} suggestion(s))"
             else:
                 results["summary"] = "All validation checks passed"
         else:
-            error_count = len(tier1_errors)
-            warning_count = len(tier2_warnings)
-            results["summary"] = f"Validation failed with {error_count} critical error(s) and {warning_count} warning(s)"
+            results["summary"] = f"Validation failed with {len(tier1_errors)} critical error(s)"
 
         return results
 
@@ -150,115 +140,41 @@ class BTValidationOrchestrator:
 
         return len(all_errors) == 0, all_errors
 
-    def _validate_tier2(self, file_path: str, verbose: bool) -> Tuple[bool, List[str]]:
+    def _validate_tier2(self, file_path: str, verbose: bool) -> List[str]:
         """
-        Tier 2: Important validation (parameter constraints).
+        Tier 2: Structural validation (reachability and structural checks).
 
         Returns:
-            Tuple of (passed, warnings)
+            List of suggestions
         """
-        warnings = []
+        # Run structural validation
+        _, suggestions = self.structural_checker.check_file(file_path)
 
-        try:
-            with open(file_path, 'r') as f:
-                content = f.read()
+        if verbose:
+            if suggestions:
+                print(f"  💡 Found {len(suggestions)} suggestion(s)")
+            else:
+                print("  ✓ No structural issues found")
 
-            tree = ast.parse(content)
-
-            # Check parameter constraints
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Call):
-                    if isinstance(node.func, ast.Name):
-                        action_name = node.func.id
-
-                        # Check known actions
-                        if action_name in KNOWN_ACTIONS:
-                            # Validate parameters
-                            for keyword in node.keywords:
-                                param_name = keyword.arg
-
-                                try:
-                                    param_value = ast.literal_eval(keyword.value)
-                                except:
-                                    continue
-
-                                # Check spatial constraints
-                                if action_name == "GoToPose":
-                                    if param_name == "x" and not (0 <= param_value <= 11):
-                                        warnings.append(
-                                            f"Parameter 'x' value {param_value} outside valid range [0, 11]"
-                                        )
-                                    elif param_name == "y" and not (0 <= param_value <= 11):
-                                        warnings.append(
-                                            f"Parameter 'y' value {param_value} outside valid range [0, 11]"
-                                        )
-
-                                # Check color constraints
-                                if action_name in ["SetPen", "PenDown"]:
-                                    if param_name in ["r", "g", "b"]:
-                                        if not (0 <= param_value <= 255):
-                                            warnings.append(
-                                                f"Parameter '{param_name}' value {param_value} outside valid range [0, 255]"
-                                            )
-
-            if verbose:
-                if warnings:
-                    print(f"  ⚠ Found {len(warnings)} constraint warning(s)")
-                else:
-                    print("  ✓ All constraints satisfied")
-
-        except Exception as e:
-            warnings.append(f"Failed to check constraints: {e}")
-            if verbose:
-                print(f"  ✗ Constraint check error: {e}")
-
-        return len(warnings) == 0, warnings
+        return suggestions
 
     def _validate_tier3(self, file_path: str, verbose: bool) -> List[str]:
         """
-        Tier 3: Advisory validation (semantic checks).
+        Tier 3: Semantic validation (LLM-based, reserved for future use).
+
+        This tier is reserved for future LLM-based semantic validation, such as:
+        - Action ordering (e.g., sense before pick)
+        - Precondition checking
+        - Goal achievability
+        - State transition validation
 
         Returns:
             List of suggestions
         """
         suggestions = []
 
-        try:
-            with open(file_path, 'r') as f:
-                content = f.read()
-
-            tree = ast.parse(content)
-
-            # Check for common patterns
-            # 1. Check if SetPen is used before drawing
-            # 2. Check for reasonable bounds usage
-            # 3. Check for duplicate node names (basic)
-
-            # Simple check: count actions
-            action_count = 0
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Call):
-                    if isinstance(node.func, ast.Name):
-                        if node.func.id in KNOWN_ACTIONS:
-                            action_count += 1
-
-            if action_count == 0:
-                suggestions.append("Behavior tree appears to have no actions")
-
-            if action_count > 50:
-                suggestions.append(
-                    f"Behavior tree has {action_count} actions - consider using composite actions"
-                )
-
-            if verbose:
-                if suggestions:
-                    print(f"  💡 Found {len(suggestions)} suggestion(s)")
-                else:
-                    print("  ✓ No advisory suggestions")
-
-        except Exception as e:
-            if verbose:
-                print(f"  ⚠ Advisory check skipped: {e}")
+        if verbose:
+            print("  ✓ No Tier 3 checks configured")
 
         return suggestions
 
@@ -274,16 +190,8 @@ def main():
     file_path = sys.argv[1]
     verbose = "--verbose" in sys.argv
 
-    # Find action library
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(script_dir)
-    action_library_path = os.path.join(
-        project_root,
-        "skills/bt-composer/action_library.yaml"
-    )
-
     # Run validation
-    orchestrator = BTValidationOrchestrator(action_library_path=action_library_path)
+    orchestrator = BTValidationOrchestrator()
     results = orchestrator.validate(file_path, verbose=verbose)
 
     # Output results as JSON

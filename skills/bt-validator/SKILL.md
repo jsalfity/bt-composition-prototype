@@ -25,7 +25,7 @@ Validate behavior trees to ensure:
 
 ### Step 1: Discover Available Actions
 
-Invoke the `bt-action-discovery` skill to get the robot's available actions.
+Invoke the `bt-action-discovery` skill (user-level skill in ~/.claude/skills/) to get the robot's available actions from the project's action_library.
 
 This is needed to verify all actions in the BT exist in the action library.
 
@@ -52,7 +52,7 @@ The validation returns a structured JSON response with:
 
 ### Step 4: Diagnose Errors
 
-Use `skills/bt-validator/validation-reference.md` for:
+Use `validation-reference.md` (in the same directory as this SKILL.md) for:
 - Complete error catalog with fixes
 - Detailed tier descriptions
 - Troubleshooting guide
@@ -170,7 +170,7 @@ During BT generation workflow:
 
 For complete error catalog, troubleshooting guide, and validation examples, see:
 
-**`skills/bt-validator/validation-reference.md`**
+**`validation-reference.md`** (in the same directory as this SKILL.md)
 
 This external reference includes:
 - Complete validation tier descriptions

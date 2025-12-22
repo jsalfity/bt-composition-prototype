@@ -2,62 +2,14 @@
 ROS checker for behavior tree validation.
 
 Validates that referenced ROS topics and services exist and are accessible.
-This can be integrated with ros-mcp-server for Claude to check action availability.
+Loads action definitions from action_library.yaml for domain-agnostic validation.
 """
 
 import ast
 import os
-from typing import Tuple, List, Set, Dict
+import yaml
+from typing import Tuple, List, Set, Dict, Optional
 import logging
-
-# Known action nodes and their ROS dependencies
-KNOWN_ACTIONS = {
-    "GoToPose": {
-        "topics": ["/turtle1/cmd_vel", "/turtle1/pose"],
-        "services": [],
-        "package": "py_trees_nodes.primitives",
-    },
-    "SetPen": {
-        "topics": [],
-        "services": ["/turtle1/set_pen"],
-        "package": "py_trees_nodes.primitives",
-    },
-    "MoveDistance": {
-        "topics": ["/turtle1/cmd_vel", "/turtle1/pose"],
-        "services": [],
-        "package": "py_trees_nodes.primitives",
-    },
-    "GetPose": {
-        "topics": ["/turtle1/pose"],
-        "services": [],
-        "package": "py_trees_nodes.primitives",
-    },
-    "CheckBounds": {
-        "topics": ["/turtle1/pose"],
-        "services": [],
-        "package": "py_trees_nodes.primitives",
-    },
-    "PenUp": {
-        "topics": [],
-        "services": ["/turtle1/set_pen"],
-        "package": "py_trees_nodes.primitives",
-    },
-    "PenDown": {
-        "topics": [],
-        "services": ["/turtle1/set_pen"],
-        "package": "py_trees_nodes.primitives",
-    },
-    "DrawShape": {
-        "topics": ["/turtle1/cmd_vel", "/turtle1/pose"],
-        "services": ["/turtle1/set_pen"],
-        "package": "py_trees_nodes.composites",
-    },
-    "PatrolWaypoints": {
-        "topics": ["/turtle1/cmd_vel", "/turtle1/pose"],
-        "services": [],
-        "package": "py_trees_nodes.composites",
-    },
-}
 
 
 class BTROSChecker:
@@ -65,24 +17,80 @@ class BTROSChecker:
     Validates ROS dependencies in behavior tree files.
 
     This checker:
+    - Loads action definitions from action_library.yaml
     - Extracts action node usage from BT file
     - Checks if actions are known/supported
     - Validates required ROS topics/services (if ROS connection available)
     - Provides warnings for missing dependencies
     """
 
-    def __init__(self, check_ros_live: bool = False):
+    def __init__(self, check_ros_live: bool = False, action_library_path: Optional[str] = None):
         """
         Initialize the ROS checker.
 
         Args:
             check_ros_live: If True, attempt to check actual ROS topics/services
                            (requires rosbridge connection)
+            action_library_path: Path to action_library.yaml. If None, uses default path.
         """
         self.check_ros_live = check_ros_live
         self.errors: List[str] = []
         self.warnings: List[str] = []
         self.logger = logging.getLogger("BTROSChecker")
+
+        # Load action library
+        self.known_actions = self._load_action_library(action_library_path)
+
+    def _load_action_library(self, action_library_path: Optional[str] = None) -> Dict[str, Dict]:
+        """
+        Load action definitions from action_library.yaml.
+
+        Args:
+            action_library_path: Path to action library YAML file
+
+        Returns:
+            Dictionary of action names to their definitions
+        """
+        if action_library_path is None:
+            # Default path: project_root/action_library/action_library.yaml
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(script_dir)
+            action_library_path = os.path.join(project_root, "action_library", "action_library.yaml")
+
+        if not os.path.exists(action_library_path):
+            self.logger.warning(f"Action library not found at {action_library_path}")
+            return {}
+
+        try:
+            with open(action_library_path, 'r') as f:
+                library = yaml.safe_load(f)
+
+            # Parse library into known_actions format
+            known_actions = {}
+
+            # Process primitives
+            if 'primitives' in library:
+                for action_name, action_def in library['primitives'].items():
+                    known_actions[action_name] = {
+                        "package": action_def.get("package", ""),
+                        "topics": action_def.get("ros_dependencies", {}).get("topics", []),
+                        "services": action_def.get("ros_dependencies", {}).get("services", [])
+                    }
+
+            # Process composites
+            if 'composites' in library:
+                for action_name, action_def in library['composites'].items():
+                    known_actions[action_name] = {
+                        "package": action_def.get("package", ""),
+                        "topics": action_def.get("ros_dependencies", {}).get("topics", []),
+                        "services": action_def.get("ros_dependencies", {}).get("services", [])
+                    }
+
+            return known_actions
+
+        except Exception as e:
+            self.logger.error(f"Failed to load action library: {e}")
+            return {}
 
     def check_file(self, file_path: str) -> Tuple[bool, List[str], List[str]]:
         """
@@ -120,8 +128,8 @@ class BTROSChecker:
         unknown_actions = []
 
         for action_name in used_actions:
-            if action_name in KNOWN_ACTIONS:
-                action_info = KNOWN_ACTIONS[action_name]
+            if action_name in self.known_actions:
+                action_info = self.known_actions[action_name]
                 required_topics.update(action_info["topics"])
                 required_services.update(action_info["services"])
             else:
@@ -247,14 +255,18 @@ def validate_bt_ros(
     return checker.check_file(file_path)
 
 
-def get_action_library() -> Dict[str, Dict]:
+def get_action_library(action_library_path: Optional[str] = None) -> Dict[str, Dict]:
     """
     Get the library of known actions and their ROS dependencies.
+
+    Args:
+        action_library_path: Path to action library YAML file. If None, uses default path.
 
     Returns:
         Dictionary of action names to their ROS dependencies
     """
-    return KNOWN_ACTIONS.copy()
+    checker = BTROSChecker(check_ros_live=False, action_library_path=action_library_path)
+    return checker.known_actions.copy()
 
 
 if __name__ == "__main__":
