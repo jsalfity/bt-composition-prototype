@@ -25,7 +25,7 @@ Validate behavior trees to ensure:
 
 ### Step 1: Discover Available Actions
 
-Invoke the `bt-action-discovery` skill to get the robot's available actions.
+Invoke the `bt-action-discovery` skill (user-level skill in ~/.claude/skills/) to get the robot's available actions from the project's action_library.
 
 This is needed to verify all actions in the BT exist in the action library.
 

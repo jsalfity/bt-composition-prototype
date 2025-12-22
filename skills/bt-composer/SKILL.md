@@ -16,7 +16,7 @@ description: Generate executable py_trees behavior trees for robots based on nat
 
 ### Step 1: Discover Available Actions
 
-Invoke the `bt-action-discovery` skill to get available robot actions, parameters, and constraints.
+Invoke the `bt-action-discovery` skill (user-level skill in ~/.claude/skills/) to get available robot actions, parameters, and constraints from the project's action_library.
 
 This returns:
 - Primitive actions (GoToPose, SetPen, etc.)

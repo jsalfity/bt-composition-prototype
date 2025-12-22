@@ -175,11 +175,10 @@ def check_validation():
 
 
 def check_skill_files():
-    """Check that skill files exist and are readable."""
-    print("\n5. Checking skill files...")
+    """Check that project-level files exist and are readable."""
+    print("\n5. Checking project files...")
 
     files = [
-        "skills/bt-composer/SKILL.md",
         "action_library/action_library.yaml",
     ]
 

@@ -52,7 +52,7 @@ This prototype demonstrates AI-driven behavior tree composition with validation:
 │                  (~/.claude/skills/bt-composer/)                     │
 │                                                                      │
 │  Step 1: Discover Actions                                           │
-│    ├─> Invokes: bt-action-discovery skill                           │
+│    ├─> Invokes: bt-action-discovery skill (~/.claude/skills/)      │
 │    │     └─> Reads: ./action_library/action_library.yaml            │
 │    └─> Returns: Available actions & constraints                     │
 │                                                                      │
@@ -159,7 +159,7 @@ Expected output: `ROS OK`
 
 ## Claude Skills Setup
 
-This project uses Claude Skills for AI-driven BT generation. Two generic skills must be installed in your user skills directory.
+This project uses Claude Skills for AI-driven BT generation. Three generic skills must be installed in your user skills directory.
 
 ### Install Generic Skills
 
@@ -167,6 +167,7 @@ Copy the generic skills to `~/.claude/skills/`:
 
 ```bash
 # From your local copy of the skills
+cp -r /path/to/bt-action-discovery ~/.claude/skills/
 cp -r /path/to/bt-composer ~/.claude/skills/
 cp -r /path/to/bt-validator ~/.claude/skills/
 ```
@@ -174,6 +175,7 @@ cp -r /path/to/bt-validator ~/.claude/skills/
 Or create symlinks (recommended for development):
 
 ```bash
+ln -s /path/to/shared/bt-action-discovery ~/.claude/skills/bt-action-discovery
 ln -s /path/to/shared/bt-composer ~/.claude/skills/bt-composer
 ln -s /path/to/shared/bt-validator ~/.claude/skills/bt-validator
 ```
@@ -184,12 +186,17 @@ Check that skills are available:
 
 ```bash
 ls ~/.claude/skills/
-# Should show: bt-composer  bt-validator
+# Should show: bt-action-discovery  bt-composer  bt-validator
 ```
 
-### Project-Specific Skill
+### User-Level Skills
 
-The `bt-action-discovery` skill is project-specific and lives in `./skills/bt-action-discovery/`. It reads the project's `action_library/action_library.yaml` to discover available robot actions.
+All three skills are now **user-level** skills in `~/.claude/skills/`:
+- `bt-composer` - Generic BT generation logic
+- `bt-validator` - Generic validation logic
+- `bt-action-discovery` - Generic action discovery (reads from project's `action_library/action_library.yaml`)
+
+The skills are **generic and reusable** across any robotics project. The **action library** is **project-specific** and defines what actions are available for each robot/environment.
 
 ---
 
@@ -241,16 +248,13 @@ bt-composition-prototype/
 ├── README.md                   # This file
 ├── requirements.txt            # Python dependencies
 │
-├── skills/                     # Project-specific Claude Skill
-│   └── bt-action-discovery/
-│       └── SKILL.md            # Discovers robot actions from YAML
-│
-├── action_library/             # Available actions & constraints
+├── action_library/             # Robot/environment-specific actions
 │   └── action_library.yaml    # Action definitions & ROS dependencies
 │
 ├── validation/                 # BT validation tools
 │   ├── orchestrator.py         # 3-tier validation coordinator
 │   ├── syntax_checker.py       # Tier 1: Syntax & structure
+│   ├── structural_checker.py   # Tier 2: Structural validation
 │   └── ros_checker.py          # Tier 1: Action existence
 │
 ├── bt_library/                 # Hand-crafted baseline BTs
