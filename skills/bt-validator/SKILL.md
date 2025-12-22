@@ -52,7 +52,7 @@ The validation returns a structured JSON response with:
 
 ### Step 4: Diagnose Errors
 
-Use `skills/bt-validator/validation-reference.md` for:
+Use `validation-reference.md` (in the same directory as this SKILL.md) for:
 - Complete error catalog with fixes
 - Detailed tier descriptions
 - Troubleshooting guide
@@ -170,7 +170,7 @@ During BT generation workflow:
 
 For complete error catalog, troubleshooting guide, and validation examples, see:
 
-**`skills/bt-validator/validation-reference.md`**
+**`validation-reference.md`** (in the same directory as this SKILL.md)
 
 This external reference includes:
 - Complete validation tier descriptions

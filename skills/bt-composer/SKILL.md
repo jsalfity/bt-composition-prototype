@@ -128,7 +128,7 @@ If still failing after 3 attempts:
 
 For detailed generation patterns, composite structures, common patterns, and working examples, see:
 
-**`skills/bt-composer/generation-patterns.md`**
+**`generation-patterns.md`** (in the same directory as this SKILL.md)
 
 This external reference includes:
 - py_trees composite patterns (Sequence, Selector, Parallel)
